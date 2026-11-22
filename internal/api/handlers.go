@@ -1,0 +1,156 @@
+// Package api holds the HTTP handlers for the registration service.
+//
+// Owner: Suyash.
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log"
+	"net/http"
+	"strconv"
+
+	"github.com/SuyashMuley/Course-Registration-System/internal/strategy"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// SectionStore reads section data for the seat-count endpoint.
+type SectionStore interface {
+	Section(ctx context.Context, id int64) (Section, error)
+}
+
+// Section is what GET /sections/{id} returns.
+type Section struct {
+	ID        int64 `json:"id"`
+	Capacity  int   `json:"capacity"`
+	Enrolled  int   `json:"enrolled"`
+	Available int   `json:"available"`
+}
+
+// Server wires the seat strategy and section reads to HTTP routes.
+type Server struct {
+	strat    strategy.SeatStrategy
+	sections SectionStore
+}
+
+func NewServer(s strategy.SeatStrategy, store SectionStore) *Server {
+	return &Server{strat: s, sections: store}
+}
+
+// Routes returns the router. Go 1.22+ method and wildcard patterns are used.
+func (s *Server) Routes() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("POST /register", s.handleRegister)
+	mux.HandleFunc("POST /drop", s.handleDrop)
+	mux.HandleFunc("GET /sections/{id}", s.handleSection)
+	return mux
+}
+
+type request struct {
+	StudentID int64 `json:"student_id"`
+	SectionID int64 `json:"section_id"`
+}
+
+type response struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	req, ok := decode(w, r)
+	if !ok {
+		return
+	}
+	err := s.strat.Register(r.Context(), req.StudentID, req.SectionID)
+	writeResult(w, "enrolled", err)
+}
+
+func (s *Server) handleDrop(w http.ResponseWriter, r *http.Request) {
+	req, ok := decode(w, r)
+	if !ok {
+		return
+	}
+	err := s.strat.Drop(r.Context(), req.StudentID, req.SectionID)
+	writeResult(w, "dropped", err)
+}
+
+func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, response{Status: "error", Error: "invalid section id"})
+		return
+	}
+	sec, err := s.sections.Section(r.Context(), id)
+	if errors.Is(err, strategy.ErrNotFound) {
+		writeJSON(w, http.StatusNotFound, response{Status: "error", Error: err.Error()})
+		return
+	}
+	if err != nil {
+		log.Printf("section %d: %v", id, err)
+		writeJSON(w, http.StatusInternalServerError, response{Status: "error", Error: "internal error"})
+		return
+	}
+	writeJSON(w, http.StatusOK, sec)
+}
+
+// decode parses and validates a JSON body with positive student_id and section_id.
+func decode(w http.ResponseWriter, r *http.Request) (request, bool) {
+	var req request
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil || req.StudentID <= 0 || req.SectionID <= 0 {
+		writeJSON(w, http.StatusBadRequest, response{
+			Status: "error", Error: "body must be JSON with positive student_id and section_id"})
+		return request{}, false
+	}
+	return req, true
+}
+
+// writeResult maps a strategy result to an HTTP status.
+func writeResult(w http.ResponseWriter, okStatus string, err error) {
+	switch {
+	case err == nil:
+		writeJSON(w, http.StatusOK, response{Status: okStatus})
+	case errors.Is(err, strategy.ErrSectionFull):
+		writeJSON(w, http.StatusConflict, response{Status: "full", Error: err.Error()})
+	case errors.Is(err, strategy.ErrAlreadyEnrolled):
+		writeJSON(w, http.StatusConflict, response{Status: "already_enrolled", Error: err.Error()})
+	case errors.Is(err, strategy.ErrNotEnrolled):
+		writeJSON(w, http.StatusConflict, response{Status: "not_enrolled", Error: err.Error()})
+	case errors.Is(err, strategy.ErrNotFound):
+		writeJSON(w, http.StatusNotFound, response{Status: "not_found", Error: err.Error()})
+	default:
+		log.Printf("request failed: %v", err)
+		writeJSON(w, http.StatusInternalServerError, response{Status: "error", Error: "internal error"})
+	}
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// PGSections reads sections straight from Postgres. (Redis caching is added later for E6.)
+type PGSections struct{ Pool *pgxpool.Pool }
+
+func (p PGSections) Section(ctx context.Context, id int64) (Section, error) {
+	s := Section{ID: id}
+	err := p.Pool.QueryRow(ctx,
+		`SELECT capacity, enrolled FROM sections WHERE id = $1`, id,
+	).Scan(&s.Capacity, &s.Enrolled)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Section{}, strategy.ErrNotFound
+	}
+	if err != nil {
+		return Section{}, err
+	}
+	s.Available = s.Capacity - s.Enrolled
+	return s, nil
+}
