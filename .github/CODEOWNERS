@@ -1,0 +1,31 @@
+# Each path has one owner who must approve changes to it.
+# Replace the placeholder usernames with the real GitHub handles.
+#   SUYASH  = @SuyashMuley
+#   SANTOSH = @santosh50
+#   SAMEEP  = @samsaw777
+# Later matching rules take precedence over earlier ones.
+
+# Default: everything not listed below needs a review from Suyash
+*                          @SuyashMuley
+
+# Suyash: Go service, strategies, schema
+/cmd/                      @SuyashMuley
+/internal/api/             @SuyashMuley
+/internal/strategy/        @SuyashMuley
+/migrations/               @SuyashMuley
+/go.mod                    @SuyashMuley
+/go.sum                    @SuyashMuley
+
+# Sameep: metrics, observability, analysis
+/internal/metrics/         @samsaw777
+/observability/            @samsaw777
+/analysis/                 @samsaw777
+
+# Santosh: infrastructure and deployment
+/infra/                    @santosh50
+/deploy/                   @santosh50
+/loadtest/                 @santosh50
+
+# Shared docs: any one of the team may review
+/docs/                     @SuyashMuley @santosh50 @samsaw777
+/.github/                  @SuyashMuley
