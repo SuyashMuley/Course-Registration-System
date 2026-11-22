@@ -33,11 +33,11 @@
   </defs>
 
   <rect class="bg" width="1300" height="890"/>
-  <text x="20" y="32" class="tl" font-size="18">Course Registration System: Architecture (Go, PostgreSQL, Redis on AWS)</text>
+  <text x="20" y="32" class="tl" font-size="18">Course Registration System: Architecture v3 (Go, PostgreSQL, Redis on AWS)</text>
 
   <!-- ============ PRIMARY REGION ============ -->
   <rect class="region" x="20" y="50" width="800" height="650" rx="10"/>
-  <text x="36" y="76" class="tl">Primary region (e.g., us-east-1)</text>
+  <text x="36" y="76" class="tl">Phase 1: Primary region (us-east-1, Virginia)</text>
 
   <rect class="box" x="250" y="90" width="300" height="50" rx="6"/>
   <text x="400" y="112" class="tb">Load generator (k6 on EC2)</text>
@@ -59,13 +59,13 @@
 
   <rect class="stretch" x="660" y="260" width="140" height="60" rx="6"/>
   <text x="730" y="283" class="tb">SQS queue + workers</text>
-  <text x="730" y="301" class="ts">stretch variant for E4</text>
+  <text x="730" y="301" class="ts">burst buffer (E4)</text>
 
   <!-- data layer -->
-  <rect class="ap" x="60" y="400" width="200" height="70" rx="6"/>
+  <rect class="ap" x="40" y="400" width="240" height="70" rx="6"/>
   <text x="160" y="425" class="tb">ElastiCache Redis</text>
-  <text x="160" y="443" class="ts">admission filter + read cache</text>
-  <text x="160" y="458" class="ts">AP-leaning, never the source of truth</text>
+  <text x="160" y="443" class="ts">admission filter (seats + waitlist spots)</text>
+  <text x="160" y="458" class="ts">only says NO, never the source of truth</text>
 
   <rect class="cp" x="300" y="400" width="220" height="70" rx="6"/>
   <text x="410" y="425" class="tb">RDS Postgres Multi-AZ standby</text>
@@ -74,8 +74,8 @@
 
   <rect class="cp" x="560" y="400" width="220" height="70" rx="6"/>
   <text x="670" y="425" class="tb">RDS Postgres PRIMARY</text>
-  <text x="670" y="443" class="ts">single writer: seat counts</text>
-  <text x="670" y="458" class="ts">CP: zero over-enrollment</text>
+  <text x="670" y="443" class="ts">seats, enrollments, waitlist</text>
+  <text x="670" y="458" class="ts">CP: only Postgres says YES</text>
 
   <!-- arrows: LB path -->
   <path class="line" d="M400,140 L400,170"/>
@@ -100,16 +100,16 @@
   <!-- notes in primary region -->
   <text x="36" y="575" class="tl" font-size="14">Design principle</text>
   <rect x="36" y="588" width="14" height="14" class="cp"/>
-  <text x="58" y="600" class="tn">CP: seat register/drop goes through one consistent writer. During a partition it rejects writes.</text>
+  <text x="58" y="600" class="tn">CP: register, drop (+ promote next in the same transaction), and waitlist go through one writer. If Virginia is lost, writes are rejected.</text>
   <rect x="36" y="610" width="14" height="14" class="ap"/>
-  <text x="58" y="622" class="tn">AP-leaning: course search and seat-count reads come from Redis or replicas. Brief staleness is OK.</text>
+  <text x="58" y="622" class="tn">AP-leaning: search, seat counts, and waitlist views come from Redis or replicas. Brief staleness is OK.</text>
   <rect x="36" y="632" width="14" height="14" class="stretch"/>
-  <text x="58" y="644" class="tn">Dashed gray: optional stretch (SQS queue). Redis is never trusted for the final seat decision.</text>
-  <text x="36" y="672" class="tn">Experiments E1 to E6 run in this single region so cross-region latency does not distort them.</text>
+  <text x="58" y="644" class="tn">Dashed gray: optional stretch (SQS buffers bursts only; the waitlist lives in Postgres).</text>
+  <text x="36" y="672" class="tn">Outcome is ENROLLED, WAITLISTED (#n), or FULL. E1 to E6 run in this region only.</text>
 
   <!-- ============ SECOND REGION ============ -->
   <rect class="region" x="860" y="50" width="420" height="650" rx="10"/>
-  <text x="876" y="76" class="tl">Second region (e.g., ap-south-1), E7 only</text>
+  <text x="876" y="76" class="tl">Phase 2: us-west-1 (California), E7</text>
 
   <rect class="box" x="900" y="90" width="340" height="50" rx="6"/>
   <text x="1070" y="112" class="tb">Remote load generator (EC2)</text>
@@ -121,10 +121,10 @@
 
   <rect class="box" x="900" y="260" width="160" height="60" rx="6"/>
   <text x="980" y="283" class="tb">Go app #1</text>
-  <text x="980" y="301" class="ts">EC2, stateless</text>
+  <text x="980" y="301" class="ts">reads local, forwards writes</text>
   <rect class="box" x="1080" y="260" width="160" height="60" rx="6"/>
   <text x="1160" y="283" class="tb">Go app #2</text>
-  <text x="1160" y="301" class="ts">EC2, stateless</text>
+  <text x="1160" y="301" class="ts">reads local, forwards writes</text>
 
   <rect class="ap" x="880" y="400" width="190" height="70" rx="6"/>
   <text x="975" y="425" class="tb">RDS read replica</text>
@@ -133,7 +133,8 @@
 
   <rect class="ap" x="1090" y="400" width="170" height="70" rx="6"/>
   <text x="1175" y="425" class="tb">ElastiCache Redis</text>
-  <text x="1175" y="443" class="ts">regional read cache</text>
+  <text x="1175" y="443" class="ts">regional read cache only</text>
+  <text x="1175" y="458" class="ts">(admission runs in Virginia)</text>
 
   <path class="line" d="M1070,140 L1070,170"/>
   <path class="noarrow" d="M1070,220 L1070,240 M980,240 L1160,240"/>
@@ -143,13 +144,14 @@
   <path class="linegreen" d="M980,360 L975,360 L975,400"/>
   <path class="linegreen" d="M1160,360 L1175,360 L1175,400"/>
   <!-- forwarded writes -->
-  <path class="linefwd" d="M900,300 L840,300 L840,440 L780,440"/>
-  <text transform="rotate(-90 852 370)" x="852" y="370" class="tn" fill="#c05621" text-anchor="middle">forwarded writes</text>
+  <path class="linefwd" d="M900,300 L840,300 L840,195 L550,195"/>
+  <text x="690" y="166" class="ts" fill="#c05621">forwarded writes: whole HTTP request</text>
+  <text x="690" y="181" class="ts" fill="#c05621">to Virginia ALB, no direct DB link</text>
 
-  <text x="876" y="575" class="tn">Reads are served locally. Writes cross the region to the primary.</text>
-  <text x="876" y="595" class="tn">E7 measures remote-client latency, replica lag, stale reads,</text>
-  <text x="876" y="615" class="tn">and failover when the primary region is lost.</text>
-  <text x="876" y="645" class="tn">Active-active writes are future work.</text>
+  <text x="876" y="575" class="tn">Reads are served locally. Every register/drop is forwarded</text>
+  <text x="876" y="595" class="tn">to the Virginia API, so row locks are never held across the country.</text>
+  <text x="876" y="615" class="tn">If Virginia is lost: writes rejected, reads continue. E7 measures replica lag</text>
+  <text x="876" y="645" class="tn">(data at risk if promoted) and promotion time. Active-active is future work.</text>
 
   <!-- ============ OBSERVABILITY ============ -->
   <rect class="obs" x="20" y="722" width="1260" height="150" rx="10"/>
@@ -157,15 +159,15 @@
 
   <rect class="box" x="40" y="758" width="230" height="52" rx="6"/>
   <text x="155" y="779" class="tb">Prometheus + Grafana</text>
-  <text x="155" y="796" class="ts">app metrics, dashboards per experiment</text>
+  <text x="155" y="796" class="ts">per-instance scrape, summed p95</text>
 
   <rect class="box" x="290" y="758" width="210" height="52" rx="6"/>
   <text x="395" y="779" class="tb">CloudWatch Alarms</text>
-  <text x="395" y="796" class="ts">RDS, ALB, EC2, ElastiCache</text>
+  <text x="395" y="796" class="ts">RDS, ALB, EC2, ElastiCache, replica lag</text>
 
   <rect class="box" x="520" y="758" width="230" height="52" rx="6"/>
   <text x="635" y="779" class="tb">Invariant checker</text>
-  <text x="635" y="796" class="ts">alerts if enrolled &gt; capacity</text>
+  <text x="635" y="796" class="ts">enrolled ≤ cap, waitlist ≤ cap, order kept</text>
 
   <rect class="box" x="770" y="758" width="170" height="52" rx="6"/>
   <text x="855" y="779" class="tb">AWS Budgets</text>
@@ -181,7 +183,7 @@
 
   <path class="noarrow" d="M155,810 L155,838 M395,810 L395,838 M635,810 L635,838 M855,810 L855,838 M155,838 L1035,838"/>
   <path class="linered" d="M1035,838 L1035,810"/>
-  <text x="600" y="858" class="tn" text-anchor="middle" fill="#c53030">alerts</text>
+  <text x="600" y="858" class="tn" text-anchor="middle" fill="#c53030">alerts (incl. instance down: up == 0)</text>
   <path class="linered" d="M1100,784 L1130,784"/>
 
   <!-- metrics scrape lines up to regions -->
