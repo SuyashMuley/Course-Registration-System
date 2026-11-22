@@ -91,5 +91,4 @@ Redis may only say **no**; only Postgres can say **yes**. Redis rejects requests
 
 - Instance sizes (regions are us-east-1 and us-west-1; confirm both are available in the AWS Learner Lab)
 - Terraform or CloudFormation for infrastructure-as-code
-- Whether the minimal waitlist stays in the core (it adds a table, a promotion transaction, and invariant checks), or moves back to future work
 - Whether the SQS variant and E7 stay in scope, or become future work if time runs short

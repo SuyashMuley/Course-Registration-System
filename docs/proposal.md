@@ -26,7 +26,15 @@ date: "November 2026"
 
 # 2. Project Plan and Recent Progress
 
-**Recent progress.** **[FILL IN with what is actually done. Suggested items: architecture chosen; repo created; data model drafted; first endpoints working; load-test tool selected.]** Our earlier coursework (the key-value/DynamoDB store from the homework) gives us a base for storing and updating seat counts.
+**Recent progress.** As of November 22, we have completed:
+
+- **Design:** chose the stack (Go, PostgreSQL, Redis, AWS) and the architecture, with CP seat writes and AP-leaning reads. A teammate reviewed the first design and raised seven concerns (Redis as an admission filter only, a Postgres waitlist, forwarding remote writes instead of holding row locks across regions, failover behavior, Prometheus scraping, region choice, and scope). We adopted them and split the work into Phase 1 (single region, E1–E6) and Phase 2 (second region, E7).
+- **Repository:** a GitHub repo with an ownership-based layout and `CODEOWNERS`, so each member works in separate directories and pull requests need the owner's approval. An AWS account is available to the team.
+- **Data model:** a PostgreSQL schema for sections, students, enrollments, and a capped waitlist.
+- **Service:** a Go HTTP service with register, drop, and seat-count endpoints, a configurable seat strategy, and unit tests for the handlers.
+- **Strategies and first result:** the naive baseline and the atomic single-statement strategy, tested against a real PostgreSQL. With 200 concurrent registrations for 10 seats, naive enrolled 200 and atomic enrolled exactly 10 (Section 6).
+
+**[Santosh and Sameep: add anything you have completed, e.g., Docker Compose, the k6 load script, dashboards, or AWS setup.]** Our earlier coursework (the key-value/DynamoDB store from the homework) gives us a base for storing and updating seat counts.
 
 **Timeline and task breakdown** (about 3 weeks of remaining work; adjust to the real deadline):
 
@@ -142,17 +150,17 @@ Each run is repeated at least 3 times and reported as median with variance. Inst
 
 # 6. Preliminary Results
 
-> **Honest status: [FILL IN].** Replace the "Status" cells with real results as soon as you have them. Even one early run (E1 on the naive baseline) is valuable evidence for this section.
+> **Status as of November 22.** Only E1 has preliminary results so far (one run, Go test harness). E2–E7 have not been run yet; the table says what each still needs. Results will be added as they are collected.
 
 | Experiment | Status | Preliminary result | Remaining |
 |---|---|---|---|
-| E1 Correctness | **[FILL IN]** | **[e.g., naive strategy over-enrolled X of 10 seats with 1,000 requests]** | Run strategies 2–4 and compare |
-| E2 Scaling | **[FILL IN]** | **[none yet / single-instance baseline: X req/s, p95 Y ms]** | 2, 4, 8 instances |
-| E3 Strategy performance | **[FILL IN]** | — | All strategies at equal load |
-| E4 Spike | **[FILL IN]** | — | Step-load script and dashboards |
-| E5 Failure injection | **[FILL IN]** | — | Kill scripts and recovery measurement |
-| E6 Read caching | **[FILL IN]** | — | Cache layer and staleness checks |
-| E7 Multi-region (Phase 2) | **[FILL IN]** | — | Second-region deployment (only after E1–E6), direct vs. forwarded writes, replica-lag and promotion-time measurements |
+| E1 Correctness | Partially done (naive and atomic strategies, single run) | With 200 concurrent registrations for a 10-seat section (Go test harness calling the strategies directly, local PostgreSQL in Docker, one run): the **naive** strategy enrolled **200** students (over-enrolled by 190; the `enrolled` counter also read 200), and the **atomic** single-statement strategy enrolled **exactly 10** (counter and enrollment rows both 10). A failed duplicate registration did not leak a seat. These numbers come from one run without HTTP, so they are indicative only. | Repeat 3 times; run through the HTTP service with k6 at 1,000 users; add the locking and Redis strategies; add the drop-storm and waitlist-order checks |
+| E2 Scaling | Not yet run | None yet | Single-instance baseline through the HTTP service with k6, then 2, 4, and 8 instances behind a load balancer on AWS |
+| E3 Strategy performance | Not yet run | None yet. The naive and atomic strategies exist; locking and the Redis admission filter are still to be written. | Implement the remaining strategies; run all four at equal load |
+| E4 Spike | Not yet run | None yet | Step-load script, dashboards, and the optional SQS variant |
+| E5 Failure injection | Not yet run | None yet | Failure-injection scripts (app instance, Redis, RDS Multi-AZ failover) and recovery measurement; needs the AWS deployment |
+| E6 Read caching | Not yet run | None yet | Redis read cache and staleness checks |
+| E7 Multi-region (Phase 2) | Not yet run | None yet. Planned only after E1–E6 are done. | Second-region deployment (only after E1–E6), direct vs. forwarded writes, replica-lag and promotion-time measurements |
 
 **Hypotheses to confirm or refute** (clearly labeled as expectations, not results): the naive strategy will over-enroll; throughput will rise with instance count and then flatten once the database (row locks or connection pool) saturates; Redis admission will raise throughput but adds a consistency window to handle.
 

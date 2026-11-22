@@ -8,26 +8,26 @@ Check the due date in Canvas. One PDF per group is uploaded to Homework 9.
 
 | # | Task | Who | Files / output |
 |---|---|---|---|
-| 1 | Team meeting: review `design_concerns_for_feedback.pdf` and confirm stack, roles, regions (us-east-1 + us-west-1), and scope, including whether the minimal waitlist is in the core. Check what the AWS Learner Lab allows (regions, RDS Multi-AZ, ElastiCache, cross-region replicas). | All | Decisions in chat |
+| 1 | Team meeting: review `design_concerns_for_feedback.pdf` and confirm stack, roles, regions (us-east-1 + us-west-1), and scope. The waitlist is decided: it stays in the core. Check what the AWS Learner Lab allows (regions, RDS Multi-AZ, ElastiCache, cross-region replicas). | All | Decisions in chat |
 | 2 | Fill the `[FILL IN]` items: bios, recent progress, chat platform, meeting time, course readings | Each person fills their own bio. Sameep: Section 4. Santosh: Sections 8–9. | `docs/proposal.md` |
 | 3 | Fix the proposal for the Learner Lab limits (regions, services) | Santosh | `docs/proposal.md`, `docs/architecture.md`, `docs/architecture.svg` |
-| 4 | Build the E1 baseline code (table below) | Suyash, Santosh, Sameep | see below |
-| 5 | Run E1 and a single-instance baseline. Write the results into Section 6. | Sameep collects; Suyash and Santosh review | `docs/proposal.md` Section 6 |
+| 4 | Build the E1 baseline code (table below). Suyash's part (orders 1–3) is done. | Suyash, Santosh, Sameep | see below |
+| 5 | Run E1 and a single-instance baseline. Write the results into Section 6. | Sameep collects; Suyash and Santosh review | `docs/proposal.md` Section 6. First E1 numbers (Go test harness, one run) are already in the Section 6 table; the k6 HTTP run and the single-instance baseline are still to do. |
 | 6 | Final read-through. Delete the "DRAFT NOTE", regenerate the `.docx`, export to PDF. | Sameep | `docs/proposal.pdf` |
 | 7 | Upload one PDF to Canvas (Homework 9) | Suyash | Canvas |
 
 ### Step 4: minimum code for local E1 numbers (no AWS needed)
 
-| Order | File | Owner |
-|---|---|---|
-| 1 | `internal/db/db.go` (Postgres pool and config) | Suyash |
-| 2 | `internal/strategy/naive.go` and `atomic.go` (atomic: single statement for seat or waitlist) | Suyash |
-| 3 | `internal/api/handlers.go`, wired into `cmd/server/main.go` | Suyash |
-| 4 | `deploy/docker/Dockerfile` and `docker-compose.yml` (app + Postgres) | Santosh |
-| 5 | `loadtest/e1-correctness/e1.js` (k6) | Santosh |
-| 6 | `analysis/e1_check.py` (final `enrolled` vs `capacity`, duplicates) | Sameep |
+| Order | File | Owner | Status |
+|---|---|---|---|
+| 1 | `internal/db/db.go` (Postgres pool and config) | Suyash | Done (code written; open the PR) |
+| 2 | `internal/strategy/naive.go` and `atomic.go` (atomic: single statement for seat or waitlist) | Suyash | Done, verified against Postgres: atomic enrolled exactly 10 of 10 seats; naive enrolled 200 (200 concurrent requests). The waitlist branch is not written yet (see Stage B). |
+| 3 | `internal/api/handlers.go`, wired into `cmd/server/main.go` | Suyash | Done (handler unit tests pass; PR to open) |
+| 4 | `deploy/docker/Dockerfile` and `docker-compose.yml` (app + Postgres) | Santosh | Not started |
+| 5 | `loadtest/e1-correctness/e1.js` (k6) | Santosh | Not started (needs seed data: 1 section with capacity 10, ~1,000 students) |
+| 6 | `analysis/e1_check.py` (final `enrolled` vs `capacity`, duplicates) | Sameep | Not started |
 
-Orders 1–3 and 4 can run in parallel. Order 5 needs the handlers from order 3.
+Orders 1–3 and 4 can run in parallel. Order 5 needs the handlers from order 3, which are now written, so Santosh and Sameep can start.
 
 ## Stage B: Build (after submission, following the proposal timeline)
 
@@ -76,5 +76,5 @@ Orders 1–3 and 4 can run in parallel. Order 5 needs the handlers from order 3.
 
 ## Scope priority
 
-- **Core:** E1, E2, E3, E5.
-- **Stretch:** E4 (SQS variant), E6, E7 (Phase 2). If time runs short, cut E7 first, then the waitlist.
+- **Core:** E1, E2, E3, E5, and the waitlist (required; it is not cut).
+- **Stretch:** E4 (SQS variant), E6, E7 (Phase 2). If time runs short, cut E7 first, then the SQS variant and E6.
