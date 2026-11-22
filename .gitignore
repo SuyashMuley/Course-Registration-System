@@ -1,0 +1,51 @@
+# OS
+.DS_Store
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+
+# Go
+/bin/
+/vendor/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Secrets and local config (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials
+.aws/
+
+# Terraform / infrastructure-as-code state (can contain secrets)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+
+# Docker local data
+docker-compose.override.yml
+pgdata/
+redisdata/
+
+# Load-test and experiment output (large, regenerable)
+results/raw/
+*.har
+k6-summary.json
+
+# Python scratch (analysis scripts)
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Logs
+*.log
