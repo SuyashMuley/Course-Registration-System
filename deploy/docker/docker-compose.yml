@@ -1,0 +1,63 @@
+# Local stack for development and the E1 baseline. Run from the repository root:
+#   docker compose -f deploy/docker/docker-compose.yml up -d --build
+# Owner: Santosh.
+#
+# Postgres runs the schema and the E1 seed data the FIRST time its volume is created.
+# To start from an empty database again: docker compose -f deploy/docker/docker-compose.yml down -v
+#
+# Redis, nginx, Prometheus and Grafana are added in later PRs.
+
+name: crs
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      # Local development credentials only; never reuse them on AWS.
+      POSTGRES_USER: registration
+      POSTGRES_PASSWORD: registration
+      POSTGRES_DB: registration
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Files here run in name order on first start.
+      - ../../migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+      - ../../loadtest/e1-correctness/seed.sql:/docker-entrypoint-initdb.d/002_e1_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U registration -d registration"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    environment:
+      DATABASE_URL: postgres://registration:registration@postgres:5432/registration?sslmode=disable
+      # Pick the strategy per run: STRATEGY=naive docker compose ... up -d app
+      STRATEGY: ${STRATEGY:-atomic}
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-20}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Optional: run k6 in a container instead of installing it.
+  #   docker compose -f deploy/docker/docker-compose.yml --profile loadtest run --rm k6
+  k6:
+    image: grafana/k6:1.0.0
+    profiles: ["loadtest"]
+    environment:
+      BASE_URL: http://app:8080
+      STRATEGY: ${STRATEGY:-atomic}
+    volumes:
+      - ../../loadtest:/scripts:ro
+    command: ["run", "/scripts/e1-correctness/e1.js"]
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
