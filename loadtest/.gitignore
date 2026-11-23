@@ -1,0 +1,3 @@
+# Raw load-test output is large and regenerable; commit only results/*.csv summaries.
+# (The root .gitignore entry "results/raw/" only matches at the repo root.)
+**/results/raw/

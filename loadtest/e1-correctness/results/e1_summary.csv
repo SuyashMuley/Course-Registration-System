@@ -1,0 +1,7 @@
+strategy,run,students,capacity,enrollment_rows,enrolled_counter,over_enrolled,reg_full,reg_other_errors,p95_ms
+atomic,1,1000,10,10,10,0,990,0,63.68
+atomic,2,1000,10,10,10,0,990,0,34.16
+atomic,3,1000,10,10,10,0,990,0,61.1
+naive,1,1000,10,429,429,419,571,0,181.12
+naive,2,1000,10,47,47,37,953,0,55.05
+naive,3,1000,10,42,42,32,958,0,41.2

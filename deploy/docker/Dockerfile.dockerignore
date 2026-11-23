@@ -1,0 +1,7 @@
+# Used automatically by BuildKit for deploy/docker/Dockerfile (build context is the repo root).
+# Only go.mod, go.sum, cmd/ and internal/ are needed to build the service.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
