@@ -1,0 +1,60 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: loadtest/e1-correctness/e1.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 1000 max VUs, 2m30s max duration (incl. graceful stop):
+              * burst: 1 iterations for each of 1000 VUs (maxDuration: 2m0s, gracefulStop: 30s)
+
+time="2026-11-22T22:12:02-05:00" level=info msg="E1_RESULT strategy=naive students=1000 capacity=10 enrolled_counter=47 over_enrolled_by_counter=37" source=console
+
+
+  █ THRESHOLDS 
+
+    reg_not_found
+    ✓ 'count==0' count=0
+
+    reg_other_errors
+    ✓ 'count==0' count=0
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 1000    9375.849686/s
+    checks_succeeded...: 100.00% 1000 out of 1000
+    checks_failed......: 0.00%   0 out of 1000
+
+    ✓ answered 200 or 409
+
+    CUSTOM
+    reg_enrolled...................: 47     440.664935/s
+    reg_full.......................: 953    8935.184751/s
+    reg_not_found..................: 0      0/s
+    reg_other_errors...............: 0      0/s
+
+    HTTP
+    http_req_duration..............: avg=32.27ms min=436µs med=32.71ms max=82.32ms p(90)=51.88ms p(95)=55.05ms
+      { expected_response:true }...: avg=32.27ms min=436µs med=32.71ms max=82.32ms p(90)=51.88ms p(95)=55.05ms
+    http_req_failed................: 0.00%  0 out of 1003
+    http_reqs......................: 1003   9403.977235/s
+
+    EXECUTION
+    iteration_duration.............: avg=60.32ms min=5.2ms med=63.83ms max=90.42ms p(90)=78.82ms p(95)=80.55ms
+    iterations.....................: 1000   9375.849686/s
+
+    NETWORK
+    data_received..................: 154 kB 1.4 MB/s
+    data_sent......................: 164 kB 1.5 MB/s
+
+
+
+
+running (0m00.1s), 0000/1000 VUs, 1000 complete and 0 interrupted iterations
+burst ✓ [ 100% ] 1000 VUs  0m00.1s/2m0s  1000/1000 iters, 1 per VU

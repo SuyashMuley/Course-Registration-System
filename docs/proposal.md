@@ -34,6 +34,7 @@ date: "November 2026"
 - **Service:** a Go HTTP service with register, drop, and seat-count endpoints, a configurable seat strategy, and unit tests for the handlers.
 - **Strategies and first result:** the naive baseline and the atomic single-statement strategy, tested against a real PostgreSQL. With 200 concurrent registrations for 10 seats, naive enrolled 200 and atomic enrolled exactly 10 (Section 6).
 - **AWS Learner Lab check:** verified the AWS Learner Lab limits by test-launching RDS: PostgreSQL with Multi-AZ works, but read replicas are blocked and only us-east-1 and us-west-2 are available.
+- **Local stack and load test:** a Docker Compose setup (Go service and PostgreSQL with seed data) and a k6 script for E1 that sends 1,000 simultaneous registrations through the HTTP service for a 10-seat section (Section 6).
 
 **[Sameep: add anything you have completed, e.g., dashboards.]** Our earlier coursework (the key-value/DynamoDB store from the homework) gives us a base for storing and updating seat counts.
 
