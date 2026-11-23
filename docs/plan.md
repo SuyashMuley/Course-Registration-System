@@ -10,9 +10,9 @@ Check the due date in Canvas. One PDF per group is uploaded to Homework 9.
 |---|---|---|---|
 | 1 | Team meeting: review `design_concerns_for_feedback.pdf` and confirm stack, roles, regions (us-east-1 + us-west-2), and scope. The waitlist is decided: it stays in the core. Check what the AWS Learner Lab allows (regions, RDS Multi-AZ, ElastiCache, cross-region replicas). | All | Decisions in chat |
 | 2 | Fill the `[FILL IN]` items: bios, recent progress, chat platform, meeting time, course readings | Each person fills their own bio. Sameep: Section 4. Santosh: Sections 8–9. | `docs/proposal.md` |
-| 3 | Fix the proposal for the Learner Lab limits (regions, services) | Santosh | `docs/proposal.md`, `docs/architecture.md`, `docs/architecture.svg` |
-| 4 | Build the E1 baseline code (table below). Suyash's part (orders 1–3) is done. | Suyash, Santosh, Sameep | see below |
-| 5 | Run E1 and a single-instance baseline. Write the results into Section 6. | Sameep collects; Suyash and Santosh review | `docs/proposal.md` Section 6. First E1 numbers (Go test harness, one run) are already in the Section 6 table; the k6 HTTP run and the single-instance baseline are still to do. |
+| 3 | Fix the proposal for the Learner Lab limits (regions, services) | Santosh | Done (merged): second region is us-west-2 with no regional database; read replicas are blocked. |
+| 4 | Build the E1 baseline code (table below) | Suyash, Santosh | Done and merged. The `analysis/e1_check.py` item was dropped: `check.sql` and the results CSV replace it. |
+| 5 | Run E1 and a single-instance baseline. Write the results into Section 6. | Sameep collects; Suyash and Santosh review | `docs/proposal.md` Section 6. E1 is done: 3 runs per strategy through the HTTP service (k6) are in the Section 6 table. The single-instance baseline belongs to E2 and is not needed for submission. |
 | 6 | Final read-through. Delete the "DRAFT NOTE", regenerate the `.docx`, export to PDF. | Sameep | `docs/proposal.pdf` |
 | 7 | Upload one PDF to Canvas (Homework 9) | Suyash | Canvas |
 
@@ -20,14 +20,14 @@ Check the due date in Canvas. One PDF per group is uploaded to Homework 9.
 
 | Order | File | Owner | Status |
 |---|---|---|---|
-| 1 | `internal/db/db.go` (Postgres pool and config) | Suyash | Done (code written; open the PR) |
+| 1 | `internal/db/db.go` (Postgres pool and config) | Suyash | Done (merged) |
 | 2 | `internal/strategy/naive.go` and `atomic.go` (atomic: single statement for seat or waitlist) | Suyash | Done, verified against Postgres: atomic enrolled exactly 10 of 10 seats; naive enrolled 200 (200 concurrent requests). The waitlist branch is not written yet (see Stage B). |
-| 3 | `internal/api/handlers.go`, wired into `cmd/server/main.go` | Suyash | Done (handler unit tests pass; PR to open) |
-| 4 | `deploy/docker/Dockerfile` and `docker-compose.yml` (app + Postgres) | Santosh | Not started |
-| 5 | `loadtest/e1-correctness/e1.js` (k6) | Santosh | Not started (needs seed data: 1 section with capacity 10, ~1,000 students) |
-| 6 | `analysis/e1_check.py` (final `enrolled` vs `capacity`, duplicates) | Sameep | Not started |
+| 3 | `internal/api/handlers.go`, wired into `cmd/server/main.go` | Suyash | Done (merged; handler unit tests pass) |
+| 4 | `deploy/docker/Dockerfile` and `docker-compose.yml` (app + Postgres) | Santosh | Done (merged): Dockerfile, docker-compose.yml, README |
+| 5 | `loadtest/e1-correctness/e1.js` (k6) | Santosh | Done (merged): `e1.js`, `seed.sql`, `reset.sql`, `check.sql`, 3 runs per strategy in `results/e1_summary.csv` |
+| 6 | `analysis/e1_check.py` (final `enrolled` vs `capacity`, duplicates) | Sameep | Dropped: replaced by `loadtest/e1-correctness/check.sql` and the results CSV |
 
-Orders 1–3 and 4 can run in parallel. Order 5 needs the handlers from order 3, which are now written, so Santosh and Sameep can start.
+Orders 1–5 are done and merged as of Nov 22. Remaining before submission: the `[FILL IN]` items in `docs/proposal.md`, the final read-through, the PDF export, and the upload.
 
 ## Stage B: Build (after submission, following the proposal timeline)
 

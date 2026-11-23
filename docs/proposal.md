@@ -14,7 +14,7 @@ date: "November 2026"
 
 | Member | What they bring |
 |---|---|
-| Suyash Muley | **[FILL IN: e.g., Go backend/API development, Postgres schema, prior HW work on the Go DynamoDB store]** |
+| Suyash Muley | Builds and owns the Go service and its correctness: the PostgreSQL schema (including the waitlist), the HTTP API, the seat-allocation strategies (naive, atomic, locking, and the Redis admission filter), and the concurrency tests. Previously built a Go key-value store backed by DynamoDB in an earlier course assignment, which this project builds on. |
 | Santosh Sunkara | Infrastructure as code with Terraform and Ansible from prior industry work; containers with Docker and Kubernetes; hands-on with core AWS services. Leads AWS deployment and load testing. |
 | Sameep Sawant | **[FILL IN: e.g., observability, data analysis, Redis/caching]** |
 
@@ -32,9 +32,9 @@ date: "November 2026"
 - **Repository:** a GitHub repo with an ownership-based layout and `CODEOWNERS`, so each member works in separate directories and pull requests need the owner's approval. An AWS account is available to the team.
 - **Data model:** a PostgreSQL schema for sections, students, enrollments, and a capped waitlist.
 - **Service:** a Go HTTP service with register, drop, and seat-count endpoints, a configurable seat strategy, and unit tests for the handlers.
-- **Strategies and first result:** the naive baseline and the atomic single-statement strategy, tested against a real PostgreSQL. With 200 concurrent registrations for 10 seats, naive enrolled 200 and atomic enrolled exactly 10 (Section 6).
+- **Strategies and first results:** the naive baseline and the atomic single-statement strategy, tested against a real PostgreSQL. In an early check with 200 concurrent registrations for 10 seats, naive enrolled 200 and atomic enrolled exactly 10. E1 was then run through the HTTP service with k6 (3 runs per strategy, 1,000 students for 10 seats): atomic enrolled exactly 10 every time, and naive over-enrolled in every run (Section 6).
 - **AWS Learner Lab check:** verified the AWS Learner Lab limits by test-launching RDS: PostgreSQL with Multi-AZ works, but read replicas are blocked and only us-east-1 and us-west-2 are available.
-- **Local stack and load test:** a Docker Compose setup (Go service and PostgreSQL with seed data) and a k6 script for E1 that sends 1,000 simultaneous registrations through the HTTP service for a 10-seat section (Section 6).
+- **Local stack and load test:** a Docker Compose setup (Go service and PostgreSQL with seed data) and a k6 script for E1 that sends 1,000 simultaneous registrations through the HTTP service for a 10-seat section, with the committed results of 3 runs per strategy (Section 6).
 
 **[Sameep: add anything you have completed, e.g., dashboards.]** Our earlier coursework (the key-value/DynamoDB store from the homework) gives us a base for storing and updating seat counts.
 
@@ -42,7 +42,7 @@ date: "November 2026"
 
 | Week | Milestone | Owner(s) |
 |---|---|---|
-| Nov 23–29 | Single-instance Go service (register, drop, waitlist, seat-count APIs); Postgres schema; local Docker Compose; metrics endpoint; AWS account/budget alarm | Suyash (API/DB), Sameep (metrics), Santosh (AWS setup) |
+| Nov 23–29 | Waitlist (join, leave, promote on drop); locking strategy; real metrics endpoint and first Prometheus/Grafana dashboard; AWS budget alarm and first RDS/ElastiCache launch. *Already done (Nov 22): single-instance Go service, schema, Docker Compose, and E1.* | Suyash (waitlist, locking), Sameep (metrics), Santosh (AWS setup) |
 | Nov 30–Dec 6 | Deploy to AWS (EC2 instances behind an ALB, RDS Postgres, ElastiCache Redis); concurrency-control variants; Prometheus + Grafana; load-test harness | Santosh (AWS/LB/harness), Suyash (concurrency), Sameep (dashboards) |
 | Dec 7–13 | Run E1–E6 (Phase 1, single region); Redis variants; failure injection; analysis. **Phase 2, only if E1–E6 are done:** second region in us-west-2 (app instances, regional Redis cache, and remote clients, E7) | All; Santosh runs tests and the second region, Sameep analyzes |
 | Dec 14–end | Final report, graphs, demo, cleanup, README for classmates | All |
@@ -151,11 +151,11 @@ Each run is repeated at least 3 times and reported as median with variance. Inst
 
 # 6. Preliminary Results
 
-> **Status as of November 22.** Only E1 has preliminary results so far (one run, Go test harness). E2–E7 have not been run yet; the table says what each still needs. Results will be added as they are collected.
+> **Status as of November 22.** Only E1 has preliminary results so far (3 runs per strategy through the HTTP service). E2–E7 have not been run yet; the table says what each still needs. Results will be added as they are collected.
 
 | Experiment | Status | Preliminary result | Remaining |
 |---|---|---|---|
-| E1 Correctness | Partially done (naive and atomic strategies, single run) | With 200 concurrent registrations for a 10-seat section (Go test harness calling the strategies directly, local PostgreSQL in Docker, one run): the **naive** strategy enrolled **200** students (over-enrolled by 190; the `enrolled` counter also read 200), and the **atomic** single-statement strategy enrolled **exactly 10** (counter and enrollment rows both 10). A failed duplicate registration did not leak a seat. These numbers come from one run without HTTP, so they are indicative only. | Repeat 3 times; run through the HTTP service with k6 at 1,000 users; add the locking and Redis strategies; add the drop-storm and waitlist-order checks |
+| E1 Correctness | Partially done (naive and atomic strategies, 3 runs each) | 1,000 students (one k6 virtual user each) each send one registration at the same time for a 10-seat section, through the HTTP service, Docker Compose on one machine, local PostgreSQL. **Atomic:** exactly 10 enrolled in all 3 runs (0 over-enrolled, counter matches the rows, 990 answered "full", p95 latency 34–64 ms). **Naive:** over-enrolled in every run, but by very different amounts: 429, 47, and 42 students enrolled (over by 419, 37, and 32), p95 latency 41–181 ms. The wide spread in the naive runs shows that the race depends on timing, so we report the range and do not average it. An earlier check with a Go test harness (200 concurrent registrations, 10 seats) also gave naive 200 and atomic 10. Duplicate registrations never leaked a seat. Results are in `loadtest/e1-correctness/results/e1_summary.csv`. | Add the locking and Redis admission strategies; more runs of naive to characterize the spread; the drop-storm and waitlist-order checks; run on AWS |
 | E2 Scaling | Not yet run | None yet | Single-instance baseline through the HTTP service with k6, then 2, 4, and 8 instances behind a load balancer on AWS |
 | E3 Strategy performance | Not yet run | None yet. The naive and atomic strategies exist; locking and the Redis admission filter are still to be written. | Implement the remaining strategies; run all four at equal load |
 | E4 Spike | Not yet run | None yet | Step-load script, dashboards, and the optional SQS variant |
