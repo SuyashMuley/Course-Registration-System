@@ -171,7 +171,7 @@ Each run is repeated at least 3 times and reported as median with variance. Inst
 
 # 7. Impact
 
-Registration meltdowns are a familiar, high-stakes problem for every student. Our results show **where and why** scaling fails and how much each fix costs, using a domain the whole class understands. The benchmark kit (Docker Compose, AWS infrastructure code, load scripts, dashboards) will be documented so others can reproduce our numbers or plug in their own design. Classmates can help by running the load generator against our deployed instance or by using our workload scripts to test their own services. We will offer a short demo/README and invite classmates to try to break the seat limit. We will host a public test endpoint during announced test windows to keep AWS costs low.
+Registration meltdowns are a familiar, high-stakes problem for every student. Our results show **where and why** scaling fails and how much each fix costs, using a domain the whole class understands. The benchmark kit (Docker Compose, AWS infrastructure code, load scripts, dashboards) will be documented so others can reproduce our numbers or plug in their own design. Classmates can help by running the load generator against our deployed instance or by using our workload scripts to test their own services. We will offer a short demo/README and invite classmates to try to break the seat limit. We will host a public test endpoint during announced test windows only, because Learner Lab sessions and credits are time-limited and we want to keep AWS costs low.
 
 # 8. Team Expectations
 
