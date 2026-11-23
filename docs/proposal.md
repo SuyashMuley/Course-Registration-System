@@ -4,8 +4,6 @@ author: "Suyash Muley, Santosh Sunkara, Sameep Sawant"
 date: "November 2026"
 ---
 
-> **DRAFT NOTE (delete before submitting):** Items marked **[FILL IN]** are facts only the team knows (backgrounds, real measurements, meeting times). Nothing in Section 6 has been measured yet. Do not submit invented numbers.
-
 # 1. Problem, Team, and Overview of Experiments
 
 **Problem.** When course registration opens, thousands of students hit the system within seconds, all competing for a small number of seats. Under this load, naive systems show three failures: slow or failed requests, **race conditions that over-enroll a section** (two students both read "1 seat left" and both succeed), and stale seat counts that mislead students. Students lose seats they should have had. Administrators have to manually fix over-enrolled sections and field complaints. Our stakeholders are **students** (fair, fast, correct enrollment), **registrar/administrators** (seat limits are never violated, and they can see system health), and **future developers/operators** (they need to know where the system's limits are before registration day).
@@ -14,9 +12,9 @@ date: "November 2026"
 
 | Member | What they bring |
 |---|---|
-| Suyash Muley | Builds and owns the Go service and its correctness: the PostgreSQL schema (including the waitlist), the HTTP API, the seat-allocation strategies (naive, atomic, locking, and the Redis admission filter), and the concurrency tests. Previously built a Go key-value store backed by DynamoDB in an earlier course assignment, which this project builds on. |
+| Suyash Muley | Builds and owns the Go service and its correctness: the PostgreSQL schema (including the waitlist table), the HTTP API, the seat-allocation strategies (naive, atomic, locking, and plugging the Redis admission filter in as strategy 4), and the concurrency tests. Previously built a Go key-value store backed by DynamoDB in an earlier course assignment, which this project builds on. |
 | Santosh Sunkara | Infrastructure as code with Terraform and Ansible from prior industry work; containers with Docker and Kubernetes; hands-on with core AWS services. Leads AWS deployment and load testing. |
-| Sameep Sawant | **[FILL IN: e.g., observability, data analysis, Redis/caching]** |
+| Sameep Sawant | Observability (Prometheus, Grafana, alerts), data analysis of experiment results, the Redis caching layer, and the waitlist backend (join, leave, promote on drop). Previously built a Go shopping-cart service comparing MySQL and DynamoDB in an earlier course assignment. |
 
 **Results our experiments will evaluate.** (1) *Correctness*: zero over-enrollment and zero lost or duplicated enrollments under contention. (2) *Performance*: throughput (registrations/s), median and p95/p99 latency, error rate. (3) *Scalability*: how throughput changes as we add application instances, and where the database becomes the bottleneck. (4) *Resilience*: behavior during traffic spikes and when an application server or Redis is killed. (5) *Multi-region behavior*: many universities have campuses in different locations and time zones, so we evaluate the latency and consistency cost (cross-region write latency, row-lock hold time, stale cached reads) when users connect from a remote region, and what happens to them when the primary region fails. (6) *Waitlist correctness*: waitlist order is preserved and a freed seat always goes to the first waitlisted student, even during a burst of drops.
 
@@ -36,24 +34,26 @@ date: "November 2026"
 - **AWS Learner Lab check:** verified the AWS Learner Lab limits by test-launching RDS: PostgreSQL with Multi-AZ works, but read replicas are blocked and only us-east-1 and us-west-2 are available.
 - **Local stack and load test:** a Docker Compose setup (Go service and PostgreSQL with seed data) and a k6 script for E1 that sends 1,000 simultaneous registrations through the HTTP service for a 10-seat section, with the committed results of 3 runs per strategy (Section 6).
 
-**[Sameep: add anything you have completed, e.g., dashboards.]** Our earlier coursework (the key-value/DynamoDB store from the homework) gives us a base for storing and updating seat counts.
+- **Observability groundwork:** a metrics middleware hook in the Go service (stub for now) and the `observability/` and `analysis/` folders are set up.
+
+Our earlier coursework (the key-value/DynamoDB store from the homework) gives us a base for storing and updating seat counts.
 
 **Timeline and task breakdown** (about 3 weeks of remaining work; adjust to the real deadline):
 
 | Week | Milestone | Owner(s) |
 |---|---|---|
-| Nov 23–29 | Waitlist (join, leave, promote on drop); locking strategy; real metrics endpoint and first Prometheus/Grafana dashboard; AWS budget alarm and first RDS/ElastiCache launch. *Already done (Nov 22): single-instance Go service, schema, Docker Compose, and E1.* | Suyash (waitlist, locking), Sameep (metrics), Santosh (AWS setup) |
-| Nov 30–Dec 6 | Deploy to AWS (EC2 instances behind an ALB, RDS Postgres, ElastiCache Redis); concurrency-control variants; Prometheus + Grafana; load-test harness | Santosh (AWS/LB/harness), Suyash (concurrency), Sameep (dashboards) |
+| Nov 23–29 | Waitlist backend (join, leave, promote on drop); locking strategy; real metrics endpoint and first Prometheus/Grafana dashboard; AWS budget alarm and first RDS/ElastiCache launch. *Already done (Nov 22): single-instance Go service, schema, Docker Compose, and E1.* | Sameep (waitlist, metrics), Suyash (locking), Santosh (AWS setup) |
+| Nov 30–Dec 6 | Deploy to AWS (EC2 instances behind an ALB, RDS Postgres, ElastiCache Redis); concurrency-control variants; Redis caching; Prometheus + Grafana; load-test harness | Santosh (AWS/LB/harness), Suyash (concurrency), Sameep (Redis, dashboards) |
 | Dec 7–13 | Run E1–E6 (Phase 1, single region); Redis variants; failure injection; analysis. **Phase 2, only if E1–E6 are done:** second region in us-west-2 (app instances, regional Redis cache, and remote clients, E7) | All; Santosh runs tests and the second region, Sameep analyzes |
 | Dec 14–end | Final report, graphs, demo, cleanup, README for classmates | All |
 
-**Who does what.** Suyash owns the application service and correctness (concurrency control, tests). Santosh owns infrastructure and load generation (load balancer, deployment, workload scripts, failure injection). Sameep owns observability and analysis (metrics, dashboards, plots, cache layer). Each person reviews at least one other person's pull request every week.
+**Who does what.** Suyash owns the application service and correctness (concurrency control, tests). Santosh owns infrastructure and load generation (load balancer, deployment, workload scripts, failure injection). Sameep owns observability and analysis (metrics, dashboards, plots), Redis caching, and the waitlist backend. Each person reviews at least one other person's pull request every week.
 
 **AI in the plan: costs and benefits.**
 
 *Benefits:* faster boilerplate (handlers, Docker/Prometheus configs, load-test scripts); help writing concurrency tests and edge cases we might miss; quicker log and result analysis; draft documentation.
 
-*Costs/risks:* generated concurrency code can look right but contain subtle races, so it needs careful review and the over-enrollment test. Wrong or hallucinated configs can waste debugging time. There is time spent writing prompts and verifying output. Tool subscription or API costs are minimal **[FILL IN]**. Mitigation: no AI-generated code is merged without a human reviewer and passing tests, and we note which parts were AI-assisted in the report.
+*Costs/risks:* generated concurrency code can look right but contain subtle races, so it needs careful review and the over-enrollment test. Wrong or hallucinated configs can waste debugging time. There is time spent writing prompts and verifying output. Tool costs are minimal, and the system makes no paid AI API calls. Mitigation: no AI-generated code is merged without a human reviewer and passing tests, and we note which parts were AI-assisted in the report.
 
 # 3. Objectives
 
@@ -75,14 +75,14 @@ date: "November 2026"
 
 # 4. Related Work
 
-- **Course readings.** *Dynamo: Amazon's Highly Available Key-value Store* (DeCandia et al.) motivates our consistency vs. availability tradeoffs, and ties to our DynamoDB homework. **[FILL IN: confirm and add other course readings, e.g., on CAP theorem, consensus, consistency models, caching, and observability.]** Brewer's CAP theorem frames our choice. Dynamo is an AP design, which suits our read paths (course search, seat-count display), while seat writes need a CP design, so we use a single consistent writer. Real systems mix both per operation, and some are tunable (e.g., DynamoDB strongly vs. eventually consistent reads), so we pick per operation.
+- **Course readings.** *Dynamo: Amazon's Highly Available Key-value Store* (DeCandia et al.) motivates our consistency vs. availability tradeoffs, and ties to our DynamoDB homework. Brewer's CAP theorem frames our choice. Dynamo is an AP design, which suits our read paths (course search, seat-count display), while seat writes need a CP design, so we use a single consistent writer. Real systems mix both per operation, and some are tunable (e.g., DynamoDB strongly vs. eventually consistent reads), so we pick per operation.
 - **Concurrency control.** Classic work on optimistic vs. pessimistic locking and serializable isolation (Bernstein & Goodman; Berenson et al., "A Critique of ANSI SQL Isolation Levels") underlies our row-lock vs. conditional-update comparison.
 - **Hot spots and ticketing systems.** Ticket sales, flash sales, and airline booking face the same "many buyers, few items" contention; common solutions include atomic counters, queues, and virtual waiting rooms. We apply these ideas to registration.
 - **Geo-distribution.** Google Spanner (Corbett et al.), Amazon Aurora Global Database, and DynamoDB Global Tables show the main options for multi-region data: a single write region with read replicas, or multi-writer replication with conflict resolution or consensus. The PACELC tradeoff (Abadi) frames our question: even without failures, lower latency costs consistency. Seat counts need a single writer, so we test that design and discuss what active-active would require.
 - **Caching and Redis.** Redis atomic operations (`DECR`, Lua scripts) are widely used for inventory counters and rate limiting. We evaluate their tradeoffs against database-only designs.
 - **Scalability.** Amdahl's law and the Universal Scalability Law (Gunther) explain why adding servers does not scale linearly when a shared resource is serialized, which is our central hypothesis.
 - **Observability.** Google SRE's "four golden signals" and the Prometheus/Grafana ecosystem guide our metrics design.
-- **Other teams.** **[FILL IN: any classmate projects on load balancing, caching, or observability. Reach out and cite them.]**
+- **Other teams.** We will reach out to classmate teams working on load balancing, caching, or observability and cite them in the final report.
 
 Our contribution is a small, reproducible, end-to-end experiment on one concrete domain, which measures where scaling stops and shows what each fix costs.
 
@@ -171,24 +171,24 @@ Each run is repeated at least 3 times and reported as median with variance. Inst
 
 # 7. Impact
 
-Registration meltdowns are a familiar, high-stakes problem for every student. Our results show **where and why** scaling fails and how much each fix costs, using a domain the whole class understands. The benchmark kit (Docker Compose, AWS infrastructure code, load scripts, dashboards) will be documented so others can reproduce our numbers or plug in their own design. Classmates can help by running the load generator against our deployed instance or by using our workload scripts to test their own services. We will offer a short demo/README and invite classmates to try to break the seat limit. **[FILL IN: confirm if you will host a public test endpoint for the class.]**
+Registration meltdowns are a familiar, high-stakes problem for every student. Our results show **where and why** scaling fails and how much each fix costs, using a domain the whole class understands. The benchmark kit (Docker Compose, AWS infrastructure code, load scripts, dashboards) will be documented so others can reproduce our numbers or plug in their own design. Classmates can help by running the load generator against our deployed instance or by using our workload scripts to test their own services. We will offer a short demo/README and invite classmates to try to break the seat limit. We will host a public test endpoint during announced test windows to keep AWS costs low.
 
 # 8. Team Expectations
 
-- **Time:** each member commits to about **10–12 hours per week** **[FILL IN: confirm]**, including meetings, coding, and testing.
+- **Time:** each member commits to about **8–10 hours per week**, including meetings, coding, and testing.
 - **Deliverables:** work is tracked as issues/tasks with owners and due dates. Pull requests are small and are reviewed by another member within 24 hours.
 - **Unforeseen circumstances** (illness, interviews, emergencies): tell the team as soon as you know, ideally 48 hours ahead for planned absences (e.g., interviews). The team reassigns or reschedules tasks, and the absent member picks up equivalent work afterward. Critical-path tasks always have a named backup.
 - **Accountability:** a short weekly check-in lists what each person did and plans to do. Progress is visible through commits and pull requests. Contribution is reviewed at each milestone, and the final report lists who did what.
 
 # 9. Team Communication
 
-- **Platform:** private group chat (**[FILL IN: e.g., WhatsApp/Discord/Slack]**), not shared with course staff. Code and issues live in a shared GitHub repository.
+- **Platform:** private Microsoft Teams group chat, not shared with course staff. Code and issues live in a shared GitHub repository.
 - **Response time:** acknowledge messages within **12 hours** (within 2 hours for anything marked urgent in the 48 hours before a deadline).
-- **Synchronization:** one **weekly video meeting** of about 45 minutes **[FILL IN: day/time]**, with an additional in-person working session at campus when possible. Short async updates in chat on other days. Decisions made in meetings are posted in chat afterward.
+- **Synchronization:** one **weekly video meeting** of about 45 minutes on **Sundays at 7 PM ET**, with an additional in-person working session at campus when possible. Short async updates in chat on other days. Decisions made in meetings are posted in chat afterward.
 
 # 10. Team Responsibilities & Conflict Resolution
 
-**Task division.** See Section 2: Suyash owns the application service and correctness; Santosh owns infrastructure, load generation, and failure injection; Sameep owns observability, caching, and analysis. All three share experiment runs, the final report, and the demo, and each member writes the report sections for their own area.
+**Task division.** See Section 2: Suyash owns the application service and correctness; Santosh owns infrastructure, load generation, and failure injection; Sameep owns observability, analysis, Redis caching, and the waitlist backend. All three share experiment runs, the final report, and the demo, and each member writes the report sections for their own area.
 
 **How we address teamwork issues.** Raise concerns early and directly, focusing on the work and not the person. First, discuss it in the weekly meeting or a one-on-one call. If unresolved, agree on a written action item with an owner and a date. Technical disagreements are settled by a quick experiment or measurement where possible, or otherwise by majority vote.
 
