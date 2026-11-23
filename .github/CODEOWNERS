@@ -20,6 +20,7 @@
 /internal/metrics/         @samsaw777
 /observability/            @samsaw777
 /analysis/                 @samsaw777
+/internal/waitlist/        @samsaw777
 
 # Santosh: infrastructure and deployment
 /infra/                    @santosh50

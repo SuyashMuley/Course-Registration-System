@@ -21,7 +21,7 @@ Check the due date in Canvas. One PDF per group is uploaded to Homework 9.
 | Order | File | Owner | Status |
 |---|---|---|---|
 | 1 | `internal/db/db.go` (Postgres pool and config) | Suyash | Done (merged) |
-| 2 | `internal/strategy/naive.go` and `atomic.go` (atomic: single statement for seat or waitlist) | Suyash | Done, verified against Postgres: atomic enrolled exactly 10 of 10 seats; naive enrolled 200 (200 concurrent requests). The waitlist branch is not written yet (see Stage B). |
+| 2 | `internal/strategy/naive.go` and `atomic.go` (atomic: single statement for seat or waitlist) | Suyash | Done, verified against Postgres: atomic enrolled exactly 10 of 10 seats; naive enrolled 200 (200 concurrent requests). The waitlist is not written yet; Sameep owns it (see Stage B). |
 | 3 | `internal/api/handlers.go`, wired into `cmd/server/main.go` | Suyash | Done (merged; handler unit tests pass) |
 | 4 | `deploy/docker/Dockerfile` and `docker-compose.yml` (app + Postgres) | Santosh | Done (merged): Dockerfile, docker-compose.yml, README |
 | 5 | `loadtest/e1-correctness/e1.js` (k6) | Santosh | Done (merged): `e1.js`, `seed.sql`, `reset.sql`, `check.sql`, 3 runs per strategy in `results/e1_summary.csv` |
@@ -36,7 +36,7 @@ Orders 1–5 are done and merged as of Nov 22. Remaining before submission: the 
 | File | Owner |
 |---|---|
 | `internal/strategy/locking.go` | Suyash |
-| Waitlist: schema, join/leave, promote-next in the drop transaction | Suyash |
+| Waitlist backend in `internal/waitlist/`: join, leave, position, promote-next in the drop transaction (the schema is already in `migrations/001_init.sql`). Suyash wires the routes into `internal/api/` and calls the promotion from the drop path, in a small PR. | Sameep (backend), Suyash (wiring) |
 | `internal/metrics/metrics.go` (real Prometheus metrics and `/metrics`) | Sameep |
 | `observability/prometheus.yml`, first Grafana dashboard | Sameep |
 | AWS Budgets alarm; trial launch of RDS and ElastiCache | Santosh |
@@ -76,5 +76,5 @@ Orders 1–5 are done and merged as of Nov 22. Remaining before submission: the 
 
 ## Scope priority
 
-- **Core:** E1, E2, E3, E5, and the waitlist (required; it is not cut).
+- **Core:** E1, E2, E3, E5, and the waitlist (required; owner: Sameep; it is not cut).
 - **Stretch:** E4 (SQS variant), E6, E7 (Phase 2). If time runs short, cut E7 first, then the SQS variant and E6.

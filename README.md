@@ -9,7 +9,7 @@ Design: seat writes are CP (single consistent writer); reads are AP-leaning (Red
 | Path | Owner | Contents |
 |---|---|---|
 | `cmd/server/`, `internal/api/`, `internal/strategy/`, `migrations/` | Suyash | Go service, seat strategies, schema |
-| `internal/metrics/`, `observability/`, `analysis/` | Sameep | Metrics, dashboards, alerts, invariant checker, analysis |
+| `internal/metrics/`, `internal/waitlist/`, `observability/`, `analysis/` | Sameep | Metrics, waitlist backend, dashboards, alerts, invariant checker, analysis |
 | `infra/`, `deploy/`, `loadtest/` | Santosh | Terraform, Docker, load tests |
 | `docs/` | everyone | Proposal and architecture |
 
