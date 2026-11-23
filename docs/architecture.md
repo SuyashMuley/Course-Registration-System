@@ -11,15 +11,15 @@ Editable source: `architecture.svg`.
 | Operation | Choice | Mechanism |
 |---|---|---|
 | Register / drop a seat, join or leave the waitlist | **CP** | One writer (RDS Postgres primary) with a synchronous Multi-AZ standby. Outcome is ENROLLED, WAITLISTED (#n), or FULL. During a partition or primary-region outage, writes are rejected. |
-| Seat-count and course-search reads | **AP-leaning** | Redis cache and read replicas. Brief staleness is accepted and measured (E6, E7). |
-| Waitlist view | **AP-leaning** | Replica or cache read. The primary decides ordering. |
+| Seat-count and course-search reads | **AP-leaning** | Redis cache, falling back to the primary. Brief staleness is accepted and measured (E6, E7). |
+| Waitlist view | **AP-leaning** | Cache read. The primary decides ordering. |
 
 Redis may only say **no**; only Postgres can say **yes**. Redis rejects requests early once seats and waitlist spots are full, which protects the database during a spike. A wrong "no" costs a student a retry; a wrong "yes" would break zero over-enrollment, so every request Redis lets through is still decided by Postgres. A background job resyncs the Redis counter from Postgres every few seconds, drops increment it immediately, and an empty Redis (after a restart) lets requests through to Postgres.
 
 ## Phasing
 
 - **Phase 1:** a complete single-region system (us-east-1, Virginia) and experiments E1–E6.
-- **Phase 2:** second region (us-west-1, California) and E7, built only after Phase 1 is done.
+- **Phase 2:** second region (us-west-2, Oregon) and E7, built only after Phase 1 is done.
 
 ## Components
 
@@ -35,14 +35,13 @@ Redis may only say **no**; only Postgres can say **yes**. Redis rejects requests
 | RDS Multi-AZ standby | Synchronous replica in a second availability zone. Takes over on failure without losing committed writes (tested in E5). |
 | SQS queue + workers *(stretch)* | Optional burst buffer for E4 only. It is not the waitlist (the waitlist lives in Postgres). Workers must be idempotent because standard SQS is at-least-once. |
 
-### Phase 2: Second region (us-west-1, California), E7 only
+### Phase 2: Second region (us-west-2, Oregon), E7 only
 
 | Component | Purpose |
 |---|---|
 | Remote load generator | Simulates students at another campus or time zone. |
-| ALB + Go app instances | Regional entry point. Reads are served locally. Every register/drop is forwarded as a whole HTTP request to the Virginia ALB. The remote app never connects to the primary database, so row locks are never held across the country. |
-| RDS read replica (async) | Local reads that may be stale. Replica lag is measured. RDS cross-region replicas are asynchronous, so we do not auto-promote; E7 measures what failover would cost (data at risk and promotion time). |
-| Regional Redis | Regional read cache. |
+| ALB + Go app instances | Regional entry point. Reads are served locally. Every register/drop is forwarded as a whole HTTP request to the Virginia ALB. In this design the remote app never connects to the primary database, so row locks are never held across the country. E7 compares it with a variant in which the remote app connects to the primary database directly. |
+| Regional Redis | Regional read cache; misses go to Virginia. There is no regional database: the AWS Learner Lab does not allow RDS read replicas (tested Nov 22, 2026). |
 
 ### Observability and alerting (both regions)
 
@@ -57,8 +56,8 @@ Redis may only say **no**; only Postgres can say **yes**. Redis rejects requests
 ## Request flows
 
 1. **Register (primary region):** client → ALB → Go app → Redis admission check (may say no) → one Postgres statement: claim a seat, or join the waitlist, or report full → response (ENROLLED, WAITLISTED #n, or FULL).
-2. **Read seat counts:** client → ALB → Go app → Redis cache → fall back to Postgres or a replica on a miss.
-3. **Register (second region):** client → regional ALB → Go app → whole HTTP request forwarded to the Virginia ALB → handled in Virginia → response. Reads stay local.
+2. **Read seat counts:** client → ALB → Go app → Redis cache → fall back to Postgres on a miss.
+3. **Register (second region):** client → regional ALB → Go app → whole HTTP request forwarded to the Virginia ALB → handled in Virginia → response. Reads come from the regional cache.
 3b. **Drop:** Go app → one transaction: remove the enrollment and promote the first waitlisted student.
 4. **Queued register (stretch):** client → Go app → SQS → worker → Postgres. The client polls for the result. Used only to buffer bursts.
 
@@ -70,7 +69,6 @@ Redis may only say **no**; only Postgres can say **yes**. Redis rejects requests
 | App instance down (`up == 0`) | Prometheus / Grafana | High |
 | p95 latency above target for 5 minutes | Grafana / ALB | High |
 | 5xx or registration error rate above 1% | ALB / Grafana | High |
-| RDS replica lag above threshold | CloudWatch | Medium |
 | RDS CPU or connections near limit | CloudWatch | Medium |
 | Redis memory or evictions high | CloudWatch | Medium |
 | AWS spend passes budget thresholds | AWS Budgets | Medium |
@@ -85,10 +83,10 @@ Redis may only say **no**; only Postgres can say **yes**. Redis rejects requests
 | E4 | Traffic spike | Load generator, Redis, optional SQS |
 | E5 | Failure injection | Kill an app instance, kill Redis, force RDS Multi-AZ failover |
 | E6 | Read caching | Redis cache vs. direct reads (staleness) |
-| E7 (Phase 2) | Multi-region | Second region; direct DB writes vs. forwarded writes; replica lag during a spike; promotion time; primary-region outage |
+| E7 (Phase 2) | Multi-region | Second region (app instances and cache, no database); direct DB writes vs. forwarded writes; stale reads from the regional cache; primary-region outage |
 
 ## Open decisions for the team
 
-- Instance sizes (regions are us-east-1 and us-west-1; confirm both are available in the AWS Learner Lab)
+- Instance sizes (regions are fixed: us-east-1 and us-west-2, the only two the AWS Learner Lab allows). Learner Lab RDS limits: burstable classes only, nano to medium (e.g., `db.t3.medium`); gp2 storage up to 100 GB; on-demand only; Enhanced Monitoring must be turned off. Tested Nov 22, 2026: Multi-AZ works; read replicas are blocked.
 - Terraform or CloudFormation for infrastructure-as-code
 - Whether the SQS variant and E7 stay in scope, or become future work if time runs short

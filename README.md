@@ -2,7 +2,7 @@
 
 A scalable course registration system for BSDS: Go + PostgreSQL + Redis on AWS. We study how registration behaves when thousands of students enroll at once: correctness (no over-enrollment), scaling limits, failures, and multi-region behavior.
 
-Design: seat writes are CP (single consistent writer); reads are AP-leaning (cache and replicas). See [docs/architecture.md](docs/architecture.md) and [docs/proposal.md](docs/proposal.md).
+Design: seat writes are CP (single consistent writer); reads are AP-leaning (Redis cache). See [docs/architecture.md](docs/architecture.md) and [docs/proposal.md](docs/proposal.md).
 
 ## Layout and owners
 
