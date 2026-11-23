@@ -8,7 +8,7 @@ Check the due date in Canvas. One PDF per group is uploaded to Homework 9.
 
 | # | Task | Who | Files / output |
 |---|---|---|---|
-| 1 | Team meeting: review `design_concerns_for_feedback.pdf` and confirm stack, roles, regions (us-east-1 + us-west-1), and scope. The waitlist is decided: it stays in the core. Check what the AWS Learner Lab allows (regions, RDS Multi-AZ, ElastiCache, cross-region replicas). | All | Decisions in chat |
+| 1 | Team meeting: review `design_concerns_for_feedback.pdf` and confirm stack, roles, regions (us-east-1 + us-west-2), and scope. The waitlist is decided: it stays in the core. Check what the AWS Learner Lab allows (regions, RDS Multi-AZ, ElastiCache, cross-region replicas). | All | Decisions in chat |
 | 2 | Fill the `[FILL IN]` items: bios, recent progress, chat platform, meeting time, course readings | Each person fills their own bio. Sameep: Section 4. Santosh: Sections 8–9. | `docs/proposal.md` |
 | 3 | Fix the proposal for the Learner Lab limits (regions, services) | Santosh | `docs/proposal.md`, `docs/architecture.md`, `docs/architecture.svg` |
 | 4 | Build the E1 baseline code (table below). Suyash's part (orders 1–3) is done. | Suyash, Santosh, Sameep | see below |
@@ -57,7 +57,7 @@ Orders 1–3 and 4 can run in parallel. Order 5 needs the handlers from order 3,
 | File | Owner |
 |---|---|
 | `loadtest/e4-spike/`, `e5-failure/`, `e6-caching/` | Sameep |
-| Phase 2 only, after E1–E6 are done: `infra/terraform/` second region (us-west-1); `loadtest/e7-multiregion/` (direct vs. forwarded writes, replica lag, promotion time) | Santosh |
+| Phase 2 only, after E1–E6 are done: `infra/terraform/` second region (us-west-2); `loadtest/e7-multiregion/` (direct vs. forwarded writes, cross-region latency, stale reads; no read replica, the Learner Lab blocks it) | Santosh |
 | `analysis/` plots for all experiments | Sameep |
 | Optional SQS variant (E4 stretch) | Whoever finishes first |
 

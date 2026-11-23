@@ -102,14 +102,14 @@
   <rect x="36" y="588" width="14" height="14" class="cp"/>
   <text x="58" y="600" class="tn">CP: register, drop (+ promote next in the same transaction), and waitlist go through one writer. If Virginia is lost, writes are rejected.</text>
   <rect x="36" y="610" width="14" height="14" class="ap"/>
-  <text x="58" y="622" class="tn">AP-leaning: search, seat counts, and waitlist views come from Redis or replicas. Brief staleness is OK.</text>
+  <text x="58" y="622" class="tn">AP-leaning: search, seat counts, and waitlist views come from the Redis cache. Brief staleness is OK.</text>
   <rect x="36" y="632" width="14" height="14" class="stretch"/>
   <text x="58" y="644" class="tn">Dashed gray: optional stretch (SQS buffers bursts only; the waitlist lives in Postgres).</text>
   <text x="36" y="672" class="tn">Outcome is ENROLLED, WAITLISTED (#n), or FULL. E1 to E6 run in this region only.</text>
 
   <!-- ============ SECOND REGION ============ -->
   <rect class="region" x="860" y="50" width="420" height="650" rx="10"/>
-  <text x="876" y="76" class="tl">Phase 2: us-west-1 (California), E7</text>
+  <text x="876" y="76" class="tl">Phase 2: us-west-2 (Oregon), E7</text>
 
   <rect class="box" x="900" y="90" width="340" height="50" rx="6"/>
   <text x="1070" y="112" class="tb">Remote load generator (EC2)</text>
@@ -126,10 +126,10 @@
   <text x="1160" y="283" class="tb">Go app #2</text>
   <text x="1160" y="301" class="ts">reads local, forwards writes</text>
 
-  <rect class="ap" x="880" y="400" width="190" height="70" rx="6"/>
-  <text x="975" y="425" class="tb">RDS read replica</text>
-  <text x="975" y="443" class="ts">local reads, may be stale</text>
-  <text x="975" y="458" class="ts">AP-leaning</text>
+  <rect class="stretch" x="880" y="400" width="190" height="70" rx="6"/>
+  <text x="975" y="425" class="tb">E7a: direct DB link</text>
+  <text x="975" y="443" class="ts">remote app writes straight</text>
+  <text x="975" y="458" class="ts">to Virginia (comparison only)</text>
 
   <rect class="ap" x="1090" y="400" width="170" height="70" rx="6"/>
   <text x="1175" y="425" class="tb">ElastiCache Redis</text>
@@ -141,17 +141,18 @@
   <path class="line" d="M980,240 L980,260"/>
   <path class="line" d="M1160,240 L1160,260"/>
   <path class="noarrow" d="M980,320 L980,360 M1160,320 L1160,360 M980,360 L1160,360"/>
-  <path class="linegreen" d="M980,360 L975,360 L975,400"/>
+  <path class="linedash" d="M980,360 L975,360 L975,400"/>
   <path class="linegreen" d="M1160,360 L1175,360 L1175,400"/>
   <!-- forwarded writes -->
   <path class="linefwd" d="M900,300 L840,300 L840,195 L550,195"/>
   <text x="690" y="166" class="ts" fill="#c05621">forwarded writes: whole HTTP request</text>
   <text x="690" y="181" class="ts" fill="#c05621">to Virginia ALB, no direct DB link</text>
 
-  <text x="876" y="575" class="tn">Reads are served locally. Every register/drop is forwarded</text>
-  <text x="876" y="595" class="tn">to the Virginia API, so row locks are never held across the country.</text>
-  <text x="876" y="615" class="tn">If Virginia is lost: writes rejected, reads continue. E7 measures replica lag</text>
-  <text x="876" y="645" class="tn">(data at risk if promoted) and promotion time. Active-active is future work.</text>
+  <text x="876" y="575" class="tn">Reads come from the regional Redis cache. Every register/drop is</text>
+  <text x="876" y="595" class="tn">forwarded to the Virginia API, so row locks are never held across</text>
+  <text x="876" y="615" class="tn">the country. E7a compares this with a direct DB link (dashed).</text>
+  <text x="876" y="635" class="tn">If Virginia is lost: writes rejected, cached reads continue. No read</text>
+  <text x="876" y="655" class="tn">replica (the Learner Lab blocks it). Active-active is future work.</text>
 
   <!-- ============ OBSERVABILITY ============ -->
   <rect class="obs" x="20" y="722" width="1260" height="150" rx="10"/>
@@ -163,7 +164,7 @@
 
   <rect class="box" x="290" y="758" width="210" height="52" rx="6"/>
   <text x="395" y="779" class="tb">CloudWatch Alarms</text>
-  <text x="395" y="796" class="ts">RDS, ALB, EC2, ElastiCache, replica lag</text>
+  <text x="395" y="796" class="ts">RDS, ALB, EC2, ElastiCache, budget</text>
 
   <rect class="box" x="520" y="758" width="230" height="52" rx="6"/>
   <text x="635" y="779" class="tb">Invariant checker</text>
@@ -191,7 +192,7 @@
   <path class="linedash" d="M395,758 L395,735 L1070,735 L1070,703" />
   <text x="260" y="716" class="ts">app metrics + CloudWatch metrics from both regions</text>
 
-  <!-- async replication to region 2 (drawn last so it sits on top of region boxes) -->
-  <path class="linerepl" d="M670,470 L670,525 L975,525 L975,472"/>
-  <text x="822" y="517" class="ts" fill="#6b46c1">async cross-region replication (lag measured in E7)</text>
+  <!-- E7a direct DB link from region 2 (drawn last so it sits on top of region boxes) -->
+  <path class="linerepl" stroke-dasharray="6 4" d="M975,470 L975,525 L670,525 L670,474"/>
+  <text x="822" y="517" class="ts" fill="#6b46c1">E7a only: direct cross-region DB link</text>
 </svg>
