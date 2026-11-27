@@ -47,6 +47,7 @@ func (n *Naive) Register(ctx context.Context, studentID, sectionID int64) error 
 	return err
 }
 
+// Drop does not promote from the waitlist: the naive strategy is only the E1 baseline.
 func (n *Naive) Drop(ctx context.Context, studentID, sectionID int64) error {
 	tag, err := n.pool.Exec(ctx,
 		`DELETE FROM enrollments WHERE student_id = $1 AND section_id = $2`, studentID, sectionID)

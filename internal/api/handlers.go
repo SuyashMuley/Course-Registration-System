@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/SuyashMuley/Course-Registration-System/internal/strategy"
+	"github.com/SuyashMuley/Course-Registration-System/internal/waitlist"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -29,14 +30,23 @@ type Section struct {
 	Available int   `json:"available"`
 }
 
-// Server wires the seat strategy and section reads to HTTP routes.
+// WaitlistStore is the waitlist backend (internal/waitlist).
+type WaitlistStore interface {
+	Join(ctx context.Context, studentID, sectionID int64) (int, error)
+	Leave(ctx context.Context, studentID, sectionID int64) error
+	Position(ctx context.Context, studentID, sectionID int64) (int, error)
+	Info(ctx context.Context, sectionID int64) (waitlist.Info, error)
+}
+
+// Server wires the seat strategy, section reads and the waitlist to HTTP routes.
 type Server struct {
 	strat    strategy.SeatStrategy
 	sections SectionStore
+	wl       WaitlistStore
 }
 
-func NewServer(s strategy.SeatStrategy, store SectionStore) *Server {
-	return &Server{strat: s, sections: store}
+func NewServer(s strategy.SeatStrategy, store SectionStore, wl WaitlistStore) *Server {
+	return &Server{strat: s, sections: store, wl: wl}
 }
 
 // Routes returns the router. Go 1.22+ method and wildcard patterns are used.
@@ -49,6 +59,10 @@ func (s *Server) Routes() *http.ServeMux {
 	mux.HandleFunc("POST /register", s.handleRegister)
 	mux.HandleFunc("POST /drop", s.handleDrop)
 	mux.HandleFunc("GET /sections/{id}", s.handleSection)
+	mux.HandleFunc("GET /sections/{id}/waitlist", s.handleWaitlistInfo)
+	mux.HandleFunc("POST /waitlist/join", s.handleWaitlistJoin)
+	mux.HandleFunc("POST /waitlist/leave", s.handleWaitlistLeave)
+	mux.HandleFunc("GET /waitlist/{section_id}/position", s.handleWaitlistPosition)
 	return mux
 }
 
@@ -58,8 +72,9 @@ type request struct {
 }
 
 type response struct {
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
+	Status   string `json:"status"`
+	Error    string `json:"error,omitempty"`
+	Position int    `json:"position,omitempty"` // waitlist position, 1 = next in line
 }
 
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +93,63 @@ func (s *Server) handleDrop(w http.ResponseWriter, r *http.Request) {
 	}
 	err := s.strat.Drop(r.Context(), req.StudentID, req.SectionID)
 	writeResult(w, "dropped", err)
+}
+
+func (s *Server) handleWaitlistJoin(w http.ResponseWriter, r *http.Request) {
+	req, ok := decode(w, r)
+	if !ok {
+		return
+	}
+	pos, err := s.wl.Join(r.Context(), req.StudentID, req.SectionID)
+	if err != nil {
+		writeResult(w, "", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, response{Status: "waitlisted", Position: pos})
+}
+
+func (s *Server) handleWaitlistLeave(w http.ResponseWriter, r *http.Request) {
+	req, ok := decode(w, r)
+	if !ok {
+		return
+	}
+	err := s.wl.Leave(r.Context(), req.StudentID, req.SectionID)
+	writeResult(w, "left", err)
+}
+
+// GET /waitlist/{section_id}/position?student_id=N
+func (s *Server) handleWaitlistPosition(w http.ResponseWriter, r *http.Request) {
+	sectionID, err1 := strconv.ParseInt(r.PathValue("section_id"), 10, 64)
+	studentID, err2 := strconv.ParseInt(r.URL.Query().Get("student_id"), 10, 64)
+	if err1 != nil || err2 != nil || sectionID <= 0 || studentID <= 0 {
+		writeJSON(w, http.StatusBadRequest, response{
+			Status: "error", Error: "need a positive section id in the path and a positive student_id query parameter"})
+		return
+	}
+	pos, err := s.wl.Position(r.Context(), studentID, sectionID)
+	if errors.Is(err, waitlist.ErrNotWaitlisted) {
+		writeJSON(w, http.StatusNotFound, response{Status: "not_waitlisted", Error: err.Error()})
+		return
+	}
+	if err != nil {
+		writeResult(w, "", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, response{Status: "waitlisted", Position: pos})
+}
+
+func (s *Server) handleWaitlistInfo(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeJSON(w, http.StatusBadRequest, response{Status: "error", Error: "invalid section id"})
+		return
+	}
+	info, err := s.wl.Info(r.Context(), id)
+	if err != nil {
+		writeResult(w, "", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, info)
 }
 
 func (s *Server) handleSection(w http.ResponseWriter, r *http.Request) {
@@ -112,18 +184,26 @@ func decode(w http.ResponseWriter, r *http.Request) (request, bool) {
 	return req, true
 }
 
-// writeResult maps a strategy result to an HTTP status.
+// writeResult maps a strategy or waitlist result to an HTTP status.
 func writeResult(w http.ResponseWriter, okStatus string, err error) {
 	switch {
 	case err == nil:
 		writeJSON(w, http.StatusOK, response{Status: okStatus})
 	case errors.Is(err, strategy.ErrSectionFull):
 		writeJSON(w, http.StatusConflict, response{Status: "full", Error: err.Error()})
-	case errors.Is(err, strategy.ErrAlreadyEnrolled):
+	case errors.Is(err, strategy.ErrAlreadyEnrolled), errors.Is(err, waitlist.ErrAlreadyEnrolled):
 		writeJSON(w, http.StatusConflict, response{Status: "already_enrolled", Error: err.Error()})
 	case errors.Is(err, strategy.ErrNotEnrolled):
 		writeJSON(w, http.StatusConflict, response{Status: "not_enrolled", Error: err.Error()})
-	case errors.Is(err, strategy.ErrNotFound):
+	case errors.Is(err, waitlist.ErrAlreadyWaitlisted):
+		writeJSON(w, http.StatusConflict, response{Status: "already_waitlisted", Error: err.Error()})
+	case errors.Is(err, waitlist.ErrWaitlistFull):
+		writeJSON(w, http.StatusConflict, response{Status: "waitlist_full", Error: err.Error()})
+	case errors.Is(err, waitlist.ErrSeatsAvailable):
+		writeJSON(w, http.StatusConflict, response{Status: "seats_available", Error: err.Error()})
+	case errors.Is(err, waitlist.ErrNotWaitlisted):
+		writeJSON(w, http.StatusConflict, response{Status: "not_waitlisted", Error: err.Error()})
+	case errors.Is(err, strategy.ErrNotFound), errors.Is(err, waitlist.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, response{Status: "not_found", Error: err.Error()})
 	default:
 		log.Printf("request failed: %v", err)

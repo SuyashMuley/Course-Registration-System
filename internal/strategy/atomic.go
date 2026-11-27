@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/SuyashMuley/Course-Registration-System/internal/waitlist"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -61,13 +62,20 @@ UPDATE sections
    SET enrolled = enrolled - 1
  WHERE id IN (SELECT section_id FROM removed)`
 
+// Drop releases the seat and, in the same transaction, promotes the next waitlisted
+// student into it, so a freed seat is never visible to /register while someone is
+// waiting. The section row lock is held from the seat release until commit (a few
+// statements, not one), which serializes drops, joins and promotions per section.
 func (a *Atomic) Drop(ctx context.Context, studentID, sectionID int64) error {
-	tag, err := a.pool.Exec(ctx, dropSQL, studentID, sectionID)
-	if err != nil {
+	return pgx.BeginFunc(ctx, a.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, dropSQL, studentID, sectionID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return ErrNotEnrolled
+		}
+		_, err = waitlist.PromoteNext(ctx, tx, sectionID)
 		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotEnrolled
-	}
-	return nil
+	})
 }

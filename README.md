@@ -22,8 +22,33 @@ Ownership is enforced by `.github/CODEOWNERS`.
 - Never force-push `main`. Never commit secrets, `.env`, or Terraform state.
 - AI-assisted code gets a human review and must pass the over-enrollment test.
 
-## Run (stub)
+## Run
 
 ```
-go run ./cmd/server      # serves GET /healthz on :8080
+docker compose -f deploy/docker/docker-compose.yml up -d --build   # Postgres + app on :8080
+```
+
+## API
+
+Request bodies are JSON `{"student_id": N, "section_id": N}`.
+
+| Method | Route | Success | Errors |
+|---|---|---|---|
+| GET | `/healthz` | `ok` | |
+| POST | `/register` | `enrolled` | 409 `full`, `already_enrolled`; 404 `not_found` |
+| POST | `/drop` | `dropped` (and promotes the first waitlisted student into the seat, same transaction) | 409 `not_enrolled` |
+| GET | `/sections/{id}` | `{id, capacity, enrolled, available}` | 404 |
+| POST | `/waitlist/join` | `waitlisted` with `position` (1 = next) | 409 `seats_available`, `already_enrolled`, `already_waitlisted`, `waitlist_full`; 404 `not_found` |
+| POST | `/waitlist/leave` | `left` | 409 `not_waitlisted` |
+| GET | `/waitlist/{section_id}/position?student_id=N` | `waitlisted` with `position` | 404 `not_waitlisted` |
+| GET | `/sections/{id}/waitlist` | `{section_id, length, cap}` | 404 |
+
+Students join the waitlist only when a section is full, and promotion is first come, first served. Only the `atomic` strategy promotes on drop; `naive` is the E1 baseline.
+
+## Tests
+
+```
+go test ./...                                            # unit tests
+docker run -d --name pgtest -e POSTGRES_PASSWORD=pw -p 55432:5432 postgres:16
+TEST_DATABASE_URL=postgres://postgres:pw@localhost:55432/postgres go test ./...   # + integration
 ```

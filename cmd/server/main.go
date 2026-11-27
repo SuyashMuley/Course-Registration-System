@@ -24,6 +24,7 @@ import (
 	"github.com/SuyashMuley/Course-Registration-System/internal/db"
 	"github.com/SuyashMuley/Course-Registration-System/internal/metrics"
 	"github.com/SuyashMuley/Course-Registration-System/internal/strategy"
+	"github.com/SuyashMuley/Course-Registration-System/internal/waitlist"
 )
 
 func main() {
@@ -58,7 +59,7 @@ func main() {
 		Addr: addr,
 		// TODO(sameep): metrics.Middleware is a pass-through until real metrics land;
 		// /metrics is exposed there too.
-		Handler:           metrics.Middleware(api.NewServer(strat, api.PGSections{Pool: pool}).Routes()),
+		Handler:           metrics.Middleware(api.NewServer(strat, api.PGSections{Pool: pool}, waitlist.New(pool)).Routes()),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

@@ -43,13 +43,20 @@ func setup(t *testing.T) (*pgxpool.Pool, context.Context) {
 	// Same shape as migrations/001_init.sql, without the enrolled<=capacity constraint
 	// (the E1 schema), so the naive strategy is allowed to over-enroll.
 	stmts := []string{
-		`DROP TABLE IF EXISTS enrollments, sections, students CASCADE`,
+		`DROP TABLE IF EXISTS waitlist, enrollments, sections, students CASCADE`,
 		`CREATE TABLE students (id BIGINT PRIMARY KEY)`,
 		`CREATE TABLE sections (id BIGINT PRIMARY KEY, capacity INT NOT NULL, enrolled INT NOT NULL DEFAULT 0)`,
 		`CREATE TABLE enrollments (
 			student_id BIGINT NOT NULL REFERENCES students(id),
 			section_id BIGINT NOT NULL REFERENCES sections(id),
 			PRIMARY KEY (student_id, section_id))`,
+		// Atomic.Drop promotes from the waitlist, so the table must exist (empty here).
+		`CREATE TABLE waitlist (
+			id BIGSERIAL PRIMARY KEY,
+			section_id BIGINT NOT NULL REFERENCES sections(id),
+			student_id BIGINT NOT NULL REFERENCES students(id),
+			joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (section_id, student_id))`,
 		`INSERT INTO sections (id, capacity) VALUES (1, 10)`,
 		`INSERT INTO students SELECT generate_series(1, 200)`,
 	}
@@ -59,7 +66,7 @@ func setup(t *testing.T) (*pgxpool.Pool, context.Context) {
 		}
 	}
 	t.Cleanup(func() {
-		_, _ = pool.Exec(ctx, `DROP TABLE IF EXISTS enrollments, sections, students CASCADE`)
+		_, _ = pool.Exec(ctx, `DROP TABLE IF EXISTS waitlist, enrollments, sections, students CASCADE`)
 	})
 	return pool, ctx
 }

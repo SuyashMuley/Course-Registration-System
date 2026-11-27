@@ -51,7 +51,7 @@ func TestRegisterStatusCodes(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			s := NewServer(fakeStrategy{registerErr: tc.err}, fakeSections{})
+			s := NewServer(fakeStrategy{registerErr: tc.err}, fakeSections{}, fakeWaitlist{})
 			if got := do(t, s, "POST", "/register", tc.body).Code; got != tc.want {
 				t.Fatalf("status = %d, want %d", got, tc.want)
 			}
@@ -60,18 +60,18 @@ func TestRegisterStatusCodes(t *testing.T) {
 }
 
 func TestDropStatusCodes(t *testing.T) {
-	s := NewServer(fakeStrategy{dropErr: strategy.ErrNotEnrolled}, fakeSections{})
+	s := NewServer(fakeStrategy{dropErr: strategy.ErrNotEnrolled}, fakeSections{}, fakeWaitlist{})
 	if got := do(t, s, "POST", "/drop", `{"student_id":1,"section_id":1}`).Code; got != http.StatusConflict {
 		t.Fatalf("status = %d, want 409", got)
 	}
-	s = NewServer(fakeStrategy{}, fakeSections{})
+	s = NewServer(fakeStrategy{}, fakeSections{}, fakeWaitlist{})
 	if got := do(t, s, "POST", "/drop", `{"student_id":1,"section_id":1}`).Code; got != http.StatusOK {
 		t.Fatalf("status = %d, want 200", got)
 	}
 }
 
 func TestSection(t *testing.T) {
-	s := NewServer(fakeStrategy{}, fakeSections{sec: Section{ID: 1, Capacity: 10, Enrolled: 4, Available: 6}})
+	s := NewServer(fakeStrategy{}, fakeSections{sec: Section{ID: 1, Capacity: 10, Enrolled: 4, Available: 6}}, fakeWaitlist{})
 	rec := do(t, s, "GET", "/sections/1", "")
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"available":6`) {
 		t.Fatalf("got %d %s", rec.Code, rec.Body.String())
@@ -79,14 +79,14 @@ func TestSection(t *testing.T) {
 	if got := do(t, s, "GET", "/sections/abc", "").Code; got != http.StatusBadRequest {
 		t.Fatalf("bad id status = %d, want 400", got)
 	}
-	s = NewServer(fakeStrategy{}, fakeSections{err: strategy.ErrNotFound})
+	s = NewServer(fakeStrategy{}, fakeSections{err: strategy.ErrNotFound}, fakeWaitlist{})
 	if got := do(t, s, "GET", "/sections/7", "").Code; got != http.StatusNotFound {
 		t.Fatalf("missing section status = %d, want 404", got)
 	}
 }
 
 func TestHealth(t *testing.T) {
-	s := NewServer(fakeStrategy{}, fakeSections{})
+	s := NewServer(fakeStrategy{}, fakeSections{}, fakeWaitlist{})
 	if got := do(t, s, "GET", "/healthz", "").Code; got != http.StatusOK {
 		t.Fatalf("healthz = %d", got)
 	}
