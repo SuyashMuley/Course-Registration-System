@@ -48,6 +48,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	strat = metrics.InstrumentStrategy(strat)
+	if err := metrics.RegisterPool(pool); err != nil {
+		log.Fatal(err)
+	}
 
 	addr := ":8080"
 	if p := os.Getenv("PORT"); p != "" {
@@ -56,8 +60,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr: addr,
-		// TODO(sameep): metrics.Middleware is a pass-through until real metrics land;
-		// /metrics is exposed there too.
+		// metrics.Middleware records request metrics and serves GET /metrics.
 		Handler:           metrics.Middleware(api.NewServer(strat, api.PGSections{Pool: pool}).Routes()),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
